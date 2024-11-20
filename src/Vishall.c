@@ -1,4 +1,3 @@
-//NEW REACTIONG GAME ROUGH IDEA CODE 
 #include <stdio.h>
 #include <stdlib.h>
 #include "NUC1xx.h"
@@ -23,7 +22,7 @@ uint8_t isGameOver = 0;    // Game status (0 - ongoing, 1 - game over)
 void initializeGame(void);
 void generateRandomNumber(void);
 void showScore(void);
-void Buzz(int durationOn, int durationOff);
+void seg_display(int16_t value);
 
 // Initialize the game
 void initializeGame(void) {
@@ -51,8 +50,9 @@ void generateRandomNumber(void) {
     print_Line(1, numStr);
 }
 
-// Display the final score with blinking effect and buzzer
-// Display the final score with a long buzzer sound
+// Display the final score with blinking effect
+// Display the final score with blinking effect
+// Display the final score with blinking effect and buzzer sound
 void showScore(void) {
     char scoreStr[16];
     sprintf(scoreStr, "Score: %d / 10", score); // Format score string
@@ -65,44 +65,53 @@ void showScore(void) {
 
     // Blink the score on the seven-segment display
     for (int i = 0; i < 6; i++) { // Blink 6 times (3 seconds if delay is 500ms)
-        if (score < 10) {
-            // Single digit score
-            show_seven_segment(0, score);
-        } else {
-            // Two digit score
-            show_seven_segment(0, score / 10); // Tens place
-            DrvSYS_Delay(250000); // Short delay for refresh
-            show_seven_segment(1, score % 10); // Units place
-        }
-
+        seg_display(score); // Use seg_display() to handle single or two-digit scores
         DrvSYS_Delay(500000);         // 500ms on
         close_seven_segment();        // Turn off the display
         DrvSYS_Delay(500000);         // 500ms off
     }
 
+    // Keep the final score displayed after blinking
+    seg_display(score);
+
     // Turn OFF the buzzer after the blinking effect
     DrvGPIO_SetBit(E_GPB, 11); // Turn OFF the buzzer (GPB11 = 1)
+}
 
-    // Keep the final score displayed after blinking
-    if (score < 10) {
-        show_seven_segment(0, score);
+
+
+// Display an integer on two or more 7-segment displays
+void seg_display(int16_t value) {
+    int8_t tens, units;
+
+    // Calculate tens and units place
+    tens = value / 10;
+    units = value % 10;
+
+    // If the score is single-digit, display only the units place
+    if (value < 10) {
+        close_seven_segment();
+        show_seven_segment(0, units); // Units place on the first segment
+        DrvSYS_Delay(5000);
     } else {
-        show_seven_segment(0, score / 10); // Tens place
-        DrvSYS_Delay(250000); // Short delay for refresh
-        show_seven_segment(1, score % 10); // Units place
+        // For two-digit numbers, display both digits with a slight overlap
+        for (int i = 0; i < 5; i++) { // Show each digit alternately multiple times
+            close_seven_segment();
+            show_seven_segment(1, tens); // Tens place on the second segment
+            DrvSYS_Delay(2500);         // Short delay for refresh
+
+            close_seven_segment();
+            show_seven_segment(0, units); // Units place on the first segment
+            DrvSYS_Delay(2500);         // Short delay for refresh
+        }
+        // Keep both digits displayed simultaneously after the loop
+        close_seven_segment();
+        show_seven_segment(1, tens);   // Tens place
+        DrvSYS_Delay(5000);           // Ensure enough time for visibility
+        show_seven_segment(0, units); // Units place
     }
 }
 
-
-// Function to control the buzzer
-void Buzz(int durationOn, int durationOff) {
-    DrvGPIO_ClrBit(E_GPB, 11); // Turn on Buzzer (GPB11 = 0)
-    DrvSYS_Delay(durationOn);  // Delay for buzzer ON duration
-    DrvGPIO_SetBit(E_GPB, 11); // Turn off Buzzer (GPB11 = 1)
-    if (durationOff > 0) {
-        DrvSYS_Delay(durationOff); // Delay for buzzer OFF duration
-    }
-}
 
 // Main function
 int main(void) {
@@ -117,7 +126,6 @@ int main(void) {
     init_LCD();  // Initialize the LCD
     clear_LCD();
     OpenKeyPad(); // Initialize keypad scanning
-    DrvGPIO_Open(E_GPB, 11, E_IO_OUTPUT); // Initialize GPIO pin GPB11 for controlling Buzzer
 
     initializeGame(); // Initialize the game
 
@@ -130,13 +138,7 @@ int main(void) {
             if (keyInput > 0 && keyInput <= 9) { // Valid key press
                 if (keyInput == targetNumber) {
                     score++; // Increment score for correct guess
-                    if (score < 10) {
-                        show_seven_segment(0, score); // Display score on the first seven-segment
-                    } else {
-                        show_seven_segment(0, score / 10); // Tens place
-                        DrvSYS_Delay(250000); // Short delay for refresh
-                        show_seven_segment(1, score % 10); // Units place
-                    }
+                    seg_display(score); // Display score using seg_display()
                 }
                 break; // Move to the next round regardless of correctness
             }
